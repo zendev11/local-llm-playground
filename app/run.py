@@ -1,3 +1,7 @@
+import os
+import time
+import psutil
+from pydantic import Field
 from datetime import datetime, timezone
 import json
 from pathlib import Path
@@ -16,10 +20,43 @@ class RunConfig(BaseModel):
 	temperature: float = 0.2
 	prompt: str
 
+
+class SystemMetrics(BaseModel):
+	wall_time_s: float
+	cpu_percent: float
+	mem_rss_mb: float
+	system_mem_used_mb: float
+	system_mem_available_mb: float
+
 class RunResult(BaseModel):
 	config: RunConfig
 	response: str
 	created_at: str
+	metrics: SystemMetrics
+
+#-------------------
+#Collect Metrics
+#-------------------
+def collect_metrics(start_time:float) -> SystemMetrics:
+	proc = psutil.Process(os.getpid())
+
+	# Percent since last call; prime it once so next call is meaningful
+	proc.cpu_percent(interval=None)
+	cpu_percent = proc.cpu_percent(interval=0.1)
+
+	rss_mb = proc.memory_info().rss / (1024*1024)
+
+	vm = psutil.virtual_memory()
+	used_mb = vm.used / (1024 * 1024)
+	avail_mb = vm.available / (1024 * 1024)
+
+	return SystemMetrics(
+		wall_time_s=round(time.time() - start_time, 4),
+		cpu_percent=cpu_percent,
+		mem_rss_mb=round(rss_mb, 2),
+		system_mem_used_mb=round(used_mb, 2),
+		system_mem_available_mb=round(avail_mb, 2),
+	)
 
 #--------------------
 # Ollama call
@@ -27,6 +64,8 @@ class RunResult(BaseModel):
 OLLAMA_URL = "http://localhost:11434/api/generate"
 
 def run_prompt(config: RunConfig) -> RunResult:
+	start = time.time()
+
 	payload = {
 		"model": config.model,
 		"prompt": config.prompt,
@@ -39,10 +78,13 @@ def run_prompt(config: RunConfig) -> RunResult:
 		r.raise_for_status()
 		data = r.json()
 	
+	metrics = collect_metrics(start)
+	
 	return RunResult(
 		config = config,
-		response = data["response"],
+		response = data["response"].strip(),
 		created_at = datetime.now(timezone.utc).isoformat(),
+		metrics = metrics,
 	)
 
 #------------------
