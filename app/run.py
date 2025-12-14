@@ -54,7 +54,8 @@ def save_run(result: RunResult) -> Path:
 	runs_dir.mkdir(exist_ok=True)
 
 	timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-	file_path = runs_dir / f"run_{timestamp}.json"
+	temp_str = str(result.config.temperature).replace(".", "p")
+	file_path = runs_dir / f"run_{timestamp}_t{temp_str}.json"
 
 	with open(file_path, "w") as f:
 		json.dump(result.model_dump(), f, indent=2)
@@ -66,24 +67,34 @@ def save_run(result: RunResult) -> Path:
 #---------------
 
 if __name__ == "__main__":
-	console = Console()
+	console = Console()	
 
-	config = RunConfig(
-		prompt = "Say 'Ollama is running' and nothing else."
-	)
+	prompt = "Explain what temperature does in large language models in simple terms. Give a short example."
+	temps = [0.0, 0.3, 0.7, 1.1]
 
-	console.print("Running prompt...", style="bold cyan")
+	console.print(f"Model: [bold]{RunConfig.model_default if hasattr(RunConfig, 'model_default') else 'llama3.1:8b'}[/bold]", style="dim")
+	console.print("Running temperature comparison...\n", style="bold cyan")
 
-	result = run_prompt(config)
-	path = save_run(result)
-
-	console.print(
-		Panel(
-		   result.response.strip(),
-		   title="Model Response",
-		   border_style = "green",
+	for t in temps:
+		config = RunConfig(
+			model = "llama3.1:8b",
+			temperature = t,
+			prompt = prompt,
 		)
-	)
+		console.print(f"[bold]Temperature:[/bold] {t}", style="yellow")
+		result = run_prompt(config)
+		path = save_run(result)
 
-	console.print(f"Saved run to {path}", style="dim")
+		console.print(
+			Panel(
+				result.response.strip(),
+				title=f"Respone (t={t})",
+				border_style="green",
+			)
+		)
+		console.print(f"Saved run to {path}\n", style="dim")
+	
+
+	
+
 
