@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 
@@ -42,7 +42,7 @@ def run_prompt(config: RunConfig) -> RunResult:
 	return RunResult(
 		config = config,
 		response = data["response"],
-		created_at = datetime.utcnow().isoformat(),
+		created_at = datetime.now(timezone.utc).isoformat(),
 	)
 
 #------------------
@@ -53,7 +53,7 @@ def save_run(result: RunResult) -> Path:
 	runs_dir = Path("runs")
 	runs_dir.mkdir(exist_ok=True)
 
-	timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+	timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 	temp_str = str(result.config.temperature).replace(".", "p")
 	file_path = runs_dir / f"run_{timestamp}_t{temp_str}.json"
 
